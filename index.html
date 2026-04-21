@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>儿童识字小报生成器</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+    h1 { text-align: center; color: #333; margin-bottom: 20px; }
+    .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    label { display: block; font-weight: 600; margin-bottom: 8px; color: #555; }
+    input, select, textarea { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; margin-bottom: 16px; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #4CAF50; }
+    button { background: #4CAF50; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; }
+    button:hover { background: #45a049; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .preview { background: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 16px; white-space: pre-wrap; font-size: 14px; max-height: 300px; overflow-y: auto; margin-bottom: 16px; }
+    .result-img { max-width: 100%; border-radius: 8px; margin-top: 16px; display: none; }
+    .status { text-align: center; color: #666; padding: 10px; }
+    .vocab-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .vocab-tag { background: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 16px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>儿童识字小报生成器</h1>
+
+  <div class="card">
+    <label>选择主题/场景</label>
+    <select id="themeSelect">
+      <option value="">-- 请选择主题 --</option>
+      <option value="超市">超市</option>
+      <option value="医院">医院</option>
+      <option value="公园">公园</option>
+      <option value="学校">学校</option>
+      <option value="餐厅">餐厅</option>
+      <option value="家庭">家庭</option>
+      <option value="消防站">消防站</option>
+      <option value="农场">农场</option>
+      <option value="海底世界">海底世界</option>
+      <option value="太空">太空</option>
+    </select>
+
+    <label>小报大标题</label>
+    <input type="text" id="titleInput" placeholder="如：《快乐超市》">
+
+    <button id="generateBtn" onclick="generatePrompt()">生成提示词</button>
+  </div>
+
+  <div class="card" id="promptCard" style="display:none">
+    <label>生成的提示词</label>
+    <div class="preview" id="promptPreview"></div>
+    <button id="generateImageBtn" onclick="generateImage()">生成图片</button>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <div class="status" id="statusText">等待中...</div>
+    <img id="resultImg" class="result-img" alt="生成结果">
+  </div>
+
+  <script>
+    // 主题词汇库
+    const vocabLibrary = {
+      "超市": {
+        core: ["shōu yín yuán 收银员", "huò jià 货架", "gǒu wù chē 购物车", "shōu yín tái 收银台", "guǎng gào pái 广告牌"],
+        items: ["píng guǒ 苹果", "niú nǎi 牛奶", "miàn bāo 面包", "jī dàn 鸡蛋", "bái cài 白菜", "tǔ dòu 土豆", "xiāng蕉", "xiě guǎn 雪糕", "饮liào 饮料", "零食"],
+        env: ["chū kǒu 出口", "rù kǒu 入口", "dēng 灯", "qiáng 墙", "dì bǎn 地板", "jià 价签"]
+      },
+      "医院": {
+        core: ["yī shēng 医生", "hù shi 护士", "bìng chuáng 病床", "tīng zhěn qū 听诊器", "xié yào 药箱"],
+        items: ["wēn dù jì 温度计", "bēi zi 杯子", "shuǐ hú 水壶", "yào 药", "kǒu zhào 口罩", "shǒu 术灯", "tuō pán 托盘", "bào 报纸"],
+        env: ["mén zhěn 门诊", "zhù yuàn bù 住院部", "guà hào chù 挂号处", "qíng jié 清洁", "z行 yí 座椅", "chuāng 窗"]
+      },
+      "公园": {
+        core: ["chánɡ椅 cháng yǐ 长椅", "huā cǎo 花草", "shù 木", "dà lù 大路", "xiǎo jìng 小径"],
+        items: ["qiān qiú qiū千 qiū 千千", "shā kēnɡ 沙坑", "huá tī 滑梯", "qí mǎ 骑马", "fēng zheng 风筝", "pào mò 泡沫", "pí qiú 皮球", "shuǐ qiāng 水枪"],
+        env: ["hú 湖", "qiáo 桥", "dēng 灯", "lù dēng 路 yǐ 灯", "fēng jǐng 风景", "cǎo 草"]
+      },
+      "学校": {
+        core: ["lǎo shī 老师", "tóng xué 同学", "hēi bǎn 黑板", "kè zhuō 课桌", "jiǎng tái 讲台"],
+        items: ["bǐ 笔", "běn zi 本子", "shū bāo 书包", "qiān bǐ 铅笔", "xiàng pí 橡皮", "chǐ zi 尺子", "wén jù hé 文具盒", " tú zhǐ  图纸"],
+        env: ["cāo chǎng 操场", "tī yù guǎn 体育馆", "tú shū guǎn 图书馆", "cān tīng 餐厅", "zǒu láng 走廊", "lóu tī 楼梯"]
+      },
+      "餐厅": {
+        core: ["chú shī 厨师", "fú wù yuán 服务员", "cān zhuō 餐桌", "yǐ zi 椅子", "cān巾纸"],
+        items: ["fàn wǎn 饭碗", "cài pán 菜盘", "kuài zi 筷子", "sháo zi 勺子", "bēi zi 杯子", "pí jiǔ 啤酒", "tāng 汤", "cài 菜", "mǐ fàn 米饭", "miàn tiáo 面条"],
+        env: ["mén pái 门牌", "zhuō bù 桌布", "dēng 灯", "huā píng 花瓶", "chēng shì 秤", "zhuō 桌"]
+      },
+      "家庭": {
+        core: ["bà ba 爸爸", "mā ma 妈妈", "hái zi 孩子", "chuáng 床", "fáng zi 房子"],
+        items: ["diàn shì 电视", "shā fā 沙发", "bīng xiāng 冰箱", "xǐ yī jī 洗衣机", "kōng tiáo 空调", "zhuō zi 桌子", "yǐ zi 椅子", "chōu tì 抽屉"],
+        env: ["chú fáng 厨房", "wèi shēng jiān 卫生间", "kè tīng 客厅", "wò shì 卧室", "yáng tái 阳台", "mén 门"]
+      },
+      "消防站": {
+        core: ["xiāo fáng yuán 消防员", "xiāo fáng chē 消防车", "huǒ jiǎn 火警", "shuǐ lóng tóu 水龙头", "fáng hù 防护服"],
+        items: ["shuǐ dài 水带", "fǔ tóu 斧头", "dēng 灯", "duì jiǎng 机", "hù mù 对讲机", "kǒu shào 口哨", "hùn 头盔"],
+        env: ["chē kù 车库", "jià shǐ 室", "cāo chǎng 操场", "guà 旗杆", "mén 门", "qiáng 墙"]
+      },
+      "农场": {
+        core: ["nóng mín 农民", "gōng jī 公鸡", "mǔ jī 母鸡", "xiǎo猪 小猪", "mǎ 马"],
+        items: ["mò 牛", "yáng 羊", "tù zi 兔子", "cōng 葱", "huáng guā 黄瓜", "dōng guā 冬瓜", "fān qié 番茄", "tǔ dòu 土豆"],
+        env: ["gǒu 狗", "māo 猫", "gǔ cāo 谷草", "shuǐ jǐng 水井", "lào 牢", "fēng chē 风车"]
+      },
+      "海底世界": {
+        core: ["jīn yú 金鱼", "shā yú 鲨鱼", "hǎi tún 海豚", "hǎi mǎ 海马", "hǎi xīng 海星"],
+        items: ["shān hú 珊瑚", "bèi ké 贝壳", "hǎi zǎo 海藻", "pào pao 泡泡", "hǎi kuài 海带", "qí yú 旗鱼", "zhū 蟹", "hǎi 胆海"],
+        env: ["shā dǐ 沙底", "yán shí 岩石", "bǎo 珠", "guāi 怪", "shuǐ 水", "cǎo zǎo 草藻"]
+      },
+      "太空": {
+        core: ["háng tiān yuán 航天员", "huǒ jiàn 火箭", "wèi xīng 卫星", "tài kōng zhàn 太空站", "yuè qiú 月球"],
+        items: ["xīng qiú 星球", "héng xīng 恒星", "zhǔn 流星", "hēi dòng 黑洞", "wù zhì 物质", "guāng 光", "kōng jiān 空间", "wú zhòng 无踪"],
+        env: ["háng tiān 航天", "cāng 舱", "kòng 制台", "guān 观", "píng 屏幕", "dēng 灯"]
+      }
+    };
+
+    let currentPrompt = "";
+
+    function generatePrompt() {
+      const theme = document.getElementById('themeSelect').value;
+      const title = document.getElementById('titleInput').value.trim();
+
+      if (!theme) { alert('请选择主题'); return; }
+      if (!title) { alert('请输入标题'); return; }
+
+      const vocab = vocabLibrary[theme] || { core: [], items: [], env: [] };
+
+      const prompt = `请生成一张儿童识字小报《${theme}》，竖版 A4，学习小报版式，适合 5–9 岁孩子 认字与看图识物。
+
+# 一、小报标题区（顶部）
+
+**顶部居中大标题**：《${title}》
+* **风格**：十字小报 / 儿童学习报感
+* **文本要求**：大字、醒目、卡通手写体、彩色描边
+* **装饰**：周围添加与 ${theme} 相关的贴纸风装饰，颜色鲜艳
+
+# 二、小报主体（中间主画面）
+
+画面中心是一幅 **卡通插画风的「${theme}」场景**：
+* **整体气氛**：明亮、温暖、积极
+* **构图**：物体边界清晰，方便对应文字，不要过于拥挤。
+
+**场景分区与核心内容**
+1.  **核心区域 A（主要对象）**：表现 ${theme} 的核心活动。
+2.  **核心区域 B（配套设施）**：展示相关的工具或物品。
+3.  **核心区域 C（环境背景）**：体现环境特征（如墙面、指示牌等）。
+
+**主题人物**
+* **角色**：1 位可爱卡通人物（职业/身份：与 ${theme} 匹配）。
+* **动作**：正在进行与场景相关的自然互动。
+
+# 三、必画物体与识字清单（Generated Content）
+
+**请务必在画面中清晰绘制以下物体，并为其预留贴标签的位置：**
+
+**1. 核心角色与设施：**
+${vocab.core.join(', ')}
+
+**2. 常见物品/工具：**
+${vocab.items.join(', ')}
+
+**3. 环境与装饰：**
+${vocab.env.join(', ')}
+
+*(注意：画面中的物体数量不限于此，但以上列表必须作为重点描绘对象)*
+
+# 四、识字标注规则
+
+对上述清单中的物体，贴上中文识字标签：
+* **格式**：两行制（第一行拼音带声调，第二行简体汉字）。
+* **样式**：彩色小贴纸风格，白底黑字或深色字，清晰可读。
+* **排版**：标签靠近对应的物体，不遮挡主体。
+
+# 五、画风参数
+* **风格**：儿童绘本风 + 识字小报风
+* **色彩**：高饱和、明快、温暖 (High Saturation, Warm Tone)
+* **质量**：8k resolution, high detail, vector illustration style, clean lines.`;
+
+      currentPrompt = prompt;
+      document.getElementById('promptPreview').textContent = prompt;
+      document.getElementById('promptCard').style.display = 'block';
+    }
+
+    async function generateImage() {
+      const apiKey = prompt('请输入 API Key（来自 kie.ai/api-key）:');
+      if (!apiKey) return;
+
+      const btn = document.getElementById('generateImageBtn');
+      btn.disabled = true;
+      btn.textContent = '生成中...';
+
+      const resultCard = document.getElementById('resultCard');
+      const statusText = document.getElementById('statusText');
+      const resultImg = document.getElementById('resultImg');
+
+      resultCard.style.display = 'block';
+      statusText.textContent = '正在创建任务...';
+      resultImg.style.display = 'none';
+
+      try {
+        // Step 1: Create task
+        const createRes = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'nano-banana-pro',
+            input: {
+              prompt: currentPrompt,
+              image_input: [],
+              aspect_ratio: '3:4',
+              resolution: '2K',
+              output_format: 'png'
+            }
+          })
+        });
+
+        const createData = await createRes.json();
+        if (createData.code !== 200) {
+          throw new Error(createData.msg || '创建任务失败');
+        }
+
+        const taskId = createData.data.taskId;
+        statusText.textContent = '任务已创建，等待生成...';
+
+        // Step 2: Poll status
+        let attempts = 0;
+        const maxAttempts = 60;
+
+        while (attempts < maxAttempts) {
+          await new Promise(r => setTimeout(r, 3000));
+
+          const pollRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, {
+            headers: { 'Authorization': `Bearer ${apiKey}` }
+          });
+
+          const pollData = await pollRes.json();
+          const state = pollData.data.state;
+
+          if (state === 'success') {
+            const result = JSON.parse(pollData.data.resultJson);
+            resultImg.src = result.resultUrls[0];
+            resultImg.style.display = 'block';
+            statusText.textContent = '生成完成！';
+            break;
+          } else if (state === 'fail') {
+            throw new Error(pollData.data.failMsg || '生成失败');
+          }
+
+          attempts++;
+          statusText.textContent = `生成中... (${Math.min(attempts * 3, 180)}秒)`;
+        }
+
+        if (attempts >= maxAttempts) {
+          statusText.textContent = '超时，请稍后重试';
+        }
+
+      } catch (err) {
+        statusText.textContent = '错误: ' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '生成图片';
+      }
+    }
+  </script>
+</body>
+</html>
